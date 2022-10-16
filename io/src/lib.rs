@@ -11,7 +11,7 @@ pub struct InitConfig {
     pub decimals: u8,
 }
 
-#[derive(Debug, Decode, Encode, TypeInfo)]
+#[derive(Debug, Decode, Encode, Copy, Clone, TypeInfo)]
 pub enum FTAction {
     Mint(u128),
     Burn(u128),
@@ -28,7 +28,7 @@ pub enum FTAction {
     BalanceOf(ActorId),
 }
 
-#[derive(Debug, Encode, Decode, TypeInfo)]
+#[derive(Debug, Encode, Decode, Copy, Clone, TypeInfo)]
 pub enum FTEvent {
     Transfer {
         from: ActorId,
