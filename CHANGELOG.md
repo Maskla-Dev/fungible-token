@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2022-10-17
+### Changed
+- `Clone` trait is added to `FTAction` and `FTEvent`.
+
 ## [0.1.1] - 2022-09-20
 ### Changed
 - `gstd, gtest, gear-wasm-builder` are temporarily attached to a particular commit.
