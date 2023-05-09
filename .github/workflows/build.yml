@@ -14,14 +14,12 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GEAR_NODE_PATH: ./gear
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Artifact cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v1
 
       - name: Remove binaries from cache
         run: rm -vfr target/wasm32-unknown-unknown/*
@@ -42,21 +40,20 @@ jobs:
           sudo cp binaryen-version_110/bin/wasm-opt /usr/bin/
 
       - name: Check fmt
-        run: make fmt
+        run: make fmt-check
 
       - name: Run linter
         run: make lint
 
+      - name: Build
+        run: make build
+
       - name: Run tests
         run: |
-          curl -L https://get.gear.rs/gear-nightly-linux-x86_64.tar.xz -o - | tar xJ
-          chmod +x gear
+          curl -L https://get.gear.rs/vara-testnet-linux-x86_64.tar.xz -o - | tar xJ
           ./gear --tmp --dev &> /dev/null & echo -n $! > gear.pid
           make full-test
           kill `cat gear.pid`
-
-      - name: Build
-        run: make build
 
       - name: Upload artifacts
         if: github.event_name == 'push'
@@ -81,7 +78,7 @@ jobs:
           tag_name: build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      
       - name: Rename binaries
         run: |
           cd artifact/target/wasm32-unknown-unknown

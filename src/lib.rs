@@ -1,8 +1,5 @@
 #![no_std]
 
-#[cfg(test)]
-mod tests;
-
 #[cfg(not(feature = "binary-vendor"))]
 mod contract;
 

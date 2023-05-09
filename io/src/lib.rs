@@ -40,6 +40,7 @@ pub enum FTAction {
     },
     TotalSupply,
     BalanceOf(ActorId),
+    MigrateFullState(IoFungibleToken),
 }
 
 #[derive(Debug, Encode, Decode, TypeInfo)]
@@ -58,6 +59,7 @@ pub enum FTEvent {
     },
     TotalSupply(u128),
     Balance(u128),
+    Updated,
 }
 
 #[derive(Debug, Clone, Default, Encode, Decode, TypeInfo)]

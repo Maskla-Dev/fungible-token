@@ -132,6 +132,34 @@ impl FungibleToken {
         }
         false
     }
+
+    fn prepare_new_state(&self, new_state: IoFungibleToken) -> Self {
+        let IoFungibleToken {
+            name,
+            symbol,
+            total_supply,
+            balances,
+            allowances,
+            decimals,
+        } = new_state;
+
+        let allowances = allowances
+            .into_iter()
+            .map(|(actor_id, allows)| {
+                let allows = allows.into_iter().collect();
+                (actor_id, allows)
+            })
+            .collect();
+
+        Self {
+            name,
+            symbol,
+            total_supply,
+            balances: balances.into_iter().collect(),
+            allowances,
+            decimals,
+        }
+    }
 }
 
 fn common_state() -> <FungibleTokenMetadata as Metadata>::State {
@@ -203,6 +231,12 @@ extern "C" fn handle() {
         FTAction::BalanceOf(account) => {
             let balance = ft.balances.get(&account).unwrap_or(&0);
             msg::reply(FTEvent::Balance(*balance), 0).unwrap();
+        }
+        FTAction::MigrateFullState(new_state) => {
+            let new_ft = ft.prepare_new_state(new_state);
+            unsafe { FUNGIBLE_TOKEN.insert(new_ft) };
+
+            msg::reply(FTEvent::Updated, 0).unwrap();
         }
     }
 }
