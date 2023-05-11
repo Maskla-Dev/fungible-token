@@ -133,7 +133,7 @@ impl FungibleToken {
         false
     }
 
-    fn prepare_new_state(&self, new_state: IoFungibleToken) -> Self {
+    fn prepare_new_state(new_state: IoFungibleToken) -> Self {
         let IoFungibleToken {
             name,
             symbol,
@@ -233,7 +233,7 @@ extern "C" fn handle() {
             msg::reply(FTEvent::Balance(*balance), 0).unwrap();
         }
         FTAction::MigrateFullState(new_state) => {
-            let new_ft = ft.prepare_new_state(new_state);
+            let new_ft = FungibleToken::prepare_new_state(new_state);
             unsafe { FUNGIBLE_TOKEN.insert(new_ft) };
 
             msg::reply(FTEvent::Updated, 0).unwrap();
@@ -243,13 +243,22 @@ extern "C" fn handle() {
 
 #[no_mangle]
 extern "C" fn init() {
-    let config: InitConfig = msg::load().expect("Unable to decode InitConfig");
-    let ft = FungibleToken {
-        name: config.name,
-        symbol: config.symbol,
-        decimals: config.decimals,
-        ..Default::default()
+    let init: Initialize = msg::load().expect("Unable to decode InitConfig");
+    use ft_io::Initialize::{Config, MigrateFullState};
+    let ft = match init {
+        Config(config) => {
+            FungibleToken {
+                name: config.name,
+                symbol: config.symbol,
+                decimals: config.decimals,
+                ..Default::default()
+            }
+        },
+        MigrateFullState(io_ft) => {
+            FungibleToken::prepare_new_state(io_ft)
+        }
     };
+    
     unsafe { FUNGIBLE_TOKEN = Some(ft) };
 }
 

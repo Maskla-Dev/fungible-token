@@ -10,11 +10,11 @@ fn init_with_mint(sys: &System) {
 
     let res = ft.send(
         USERS[0],
-        InitConfig {
+        Initialize::Config(InitConfig {
             name: String::from("MyToken"),
             symbol: String::from("MTK"),
             decimals: 18,
-        },
+        }),
     );
 
     assert!(res.log().is_empty());

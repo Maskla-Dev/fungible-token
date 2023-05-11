@@ -16,22 +16,22 @@ async fn mint_test() -> Result<()> {
     assert!(listener.blocks_running().await?);
 
     // Init
-    let init_nft = InitConfig {
+    let init_ft = Initialize::Config(InitConfig {
         name: String::from("MyToken"),
         symbol: String::from("MTK"),
         decimals: 18,
-    }
+    })
     .encode();
 
     let gas_info = api
-        .calculate_upload_gas(None, WASM_BINARY_OPT.to_vec(), init_nft.clone(), 0, true)
+        .calculate_upload_gas(None, WASM_BINARY_OPT.to_vec(), init_ft.clone(), 0, true)
         .await?;
 
     let (message_id, program_id, _hash) = api
         .upload_program_bytes(
             WASM_BINARY_OPT.to_vec(),
             gclient::now_micros().to_le_bytes(),
-            init_nft,
+            init_ft,
             gas_info.min_limit,
             0,
         )
@@ -76,7 +76,70 @@ async fn mint_test() -> Result<()> {
 
 #[tokio::test]
 #[ignore]
-async fn migration_test() -> Result<()> {
+async fn migration_by_init() -> Result<()> {
+    let api = GearApi::dev().await?;
+
+    let mut listener = api.subscribe().await?; // Subscribing for events.
+
+    // Checking that blocks still running.
+    assert!(listener.blocks_running().await?);
+
+    migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 10, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 100, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 1000, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 10_000, 1).await?;
+    // No passed because 'Transaction would exhaust the block limits'
+    // migration_by_init_with_len(&api, &mut listener, 100_000, 1).await?;
+
+    migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 10, 10).await?;
+    migration_by_init_with_len(&api, &mut listener, 100, 100).await?;
+    // No passed because 'Not enught gas to continue execution'
+    // migration_by_init_with_len(&api, &mut listener, 1000, 1000).await?;
+    // migration_by_init_with_len(&api, &mut listener, 10_000, 10_000).await?;
+
+    Ok(())
+}
+
+async fn migration_by_init_with_len(
+    api: &GearApi,
+    listener: &mut EventListener,
+    balances_len: u64,
+    allowances_len: u64,
+) -> Result<()> {
+    let new_ft = create_fungible_token(balances_len, allowances_len);
+
+    // Init
+    let init_ft = Initialize::MigrateFullState(new_ft).encode();
+
+    let gas_info = api
+        .calculate_upload_gas(None, WASM_BINARY_OPT.to_vec(), init_ft.clone(), 0, true)
+        .await?;
+
+    let (message_id, _program_id, _hash) = api
+        .upload_program_bytes(
+            WASM_BINARY_OPT.to_vec(),
+            gclient::now_micros().to_le_bytes(),
+            init_ft,
+            gas_info.min_limit,
+            0,
+        )
+        .await?;
+
+    println!(
+        "Init with gas for balances len {:0>6}, allowances len {:0>6}: {:?}",
+        balances_len, allowances_len, gas_info
+    );
+
+    assert!(listener.message_processed(message_id).await?.succeed());
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn migration_by_handle() -> Result<()> {
     let api = GearApi::dev().await?;
 
     let mut listener = api.subscribe().await?; // Subscribing for events.
@@ -85,11 +148,11 @@ async fn migration_test() -> Result<()> {
     assert!(listener.blocks_running().await?);
 
     // Init
-    let init_ft = InitConfig {
+    let init_ft = Initialize::Config(InitConfig {
         name: String::from("MyToken"),
         symbol: String::from("MTK"),
         decimals: 18,
-    }
+    })
     .encode();
 
     let gas_info = api
@@ -167,26 +230,29 @@ async fn migration_test() -> Result<()> {
     Ok(())
 }
 
-async fn print_gas_info(
-    api: &GearApi,
-    program_id: [u8; 32],
-    balances_len: u64,
-    allowances_len: u64,
-) {
+fn create_fungible_token(balances_len: u64, allowances_len: u64) -> IoFungibleToken {
     let balances = (0..balances_len).map(|v| (v.into(), v as u128)).collect();
     let allowances = (0..allowances_len)
         .map(|v| (v.into(), vec![(0.into(), v as u128); 1]))
         .collect();
 
-    let new_ft = IoFungibleToken {
+    IoFungibleToken {
         name: "new-token".to_string(),
         symbol: "NT".to_string(),
         total_supply: 1_000_000,
         balances,
         allowances,
         decimals: 18,
-    };
+    }
+}
 
+async fn print_gas_info(
+    api: &GearApi,
+    program_id: [u8; 32],
+    balances_len: u64,
+    allowances_len: u64,
+) {
+    let new_ft = create_fungible_token(balances_len, allowances_len);
     let migrate = FTAction::MigrateFullState(new_ft);
 
     let gas_info = api

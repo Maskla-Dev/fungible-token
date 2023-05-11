@@ -6,12 +6,20 @@ use gstd::{prelude::*, ActorId};
 pub struct FungibleTokenMetadata;
 
 impl Metadata for FungibleTokenMetadata {
-    type Init = In<InitConfig>;
+    type Init = In<Initialize>;
     type Handle = InOut<FTAction, FTEvent>;
     type Others = ();
     type Reply = ();
     type Signal = ();
     type State = IoFungibleToken;
+}
+
+#[derive(Debug, Decode, Encode, TypeInfo)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub enum Initialize {
+    Config(InitConfig),
+    MigrateFullState(IoFungibleToken),
 }
 
 #[derive(Debug, Decode, Encode, TypeInfo)]
