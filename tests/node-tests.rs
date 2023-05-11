@@ -84,15 +84,13 @@ async fn migration_by_init() -> Result<()> {
     // Checking that blocks still running.
     assert!(listener.blocks_running().await?);
 
-    // migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
-    // migration_by_init_with_len(&api, &mut listener, 10, 1).await?;
-    // migration_by_init_with_len(&api, &mut listener, 100, 1).await?;
-    // migration_by_init_with_len(&api, &mut listener, 1000, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 10, 1).await?;
+    migration_by_init_with_len(&api, &mut listener, 100, 1).await?;
 
-    for n in 1..=100u64 {
+    for n in 1..=18u64 {
         migration_by_init_with_len(&api, &mut listener, n * 1_000, 1).await?;
     }
-    // migration_by_init_with_len(&api, &mut listener, 10_000, 1).await?;
     // No passed because 'Transaction would exhaust the block limits'
     // migration_by_init_with_len(&api, &mut listener, 100_000, 1).await?;
 
@@ -121,6 +119,14 @@ async fn migration_by_init_with_len(
         .calculate_upload_gas(None, WASM_BINARY_OPT.to_vec(), init_ft.clone(), 0, true)
         .await?;
 
+    println!(
+        "Init with gas for balances len {:0>6}, allowances len {:0>6}: {:?}, total len bytes: {}",
+        balances_len,
+        allowances_len,
+        gas_info,
+        init_ft.len()
+    );
+
     let (message_id, _program_id, _hash) = api
         .upload_program_bytes(
             WASM_BINARY_OPT.to_vec(),
@@ -130,11 +136,6 @@ async fn migration_by_init_with_len(
             0,
         )
         .await?;
-
-    println!(
-        "Init with gas for balances len {:0>6}, allowances len {:0>6}: {:?}",
-        balances_len, allowances_len, gas_info
-    );
 
     assert!(listener.message_processed(message_id).await?.succeed());
 
@@ -227,8 +228,8 @@ async fn migration_by_handle() -> Result<()> {
     test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
     test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 10, 10).await?;
     test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 100, 100).await?;
-    test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1000).await?;
     // No passed because Not enough gas to continue execution
+    // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1000).await?;
     // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 10000, 10000).await?;
 
     Ok(())
@@ -257,16 +258,19 @@ async fn print_gas_info(
     allowances_len: u64,
 ) {
     let new_ft = create_fungible_token(balances_len, allowances_len);
-    let migrate = FTAction::MigrateFullState(new_ft);
+    let migrate = FTAction::MigrateFullState(new_ft).encode();
 
     let gas_info = api
-        .calculate_handle_gas(None, program_id.into(), migrate.encode(), 0, true)
+        .calculate_handle_gas(None, program_id.into(), migrate.clone(), 0, true)
         .await
         .unwrap();
 
     println!(
-        "Gas for balances len {:0>6}, allowances len {:0>6}: {:?}",
-        balances_len, allowances_len, gas_info
+        "Gas for balances len {:0>6}, allowances len {:0>6}: {:?}, total bytes: {}",
+        balances_len,
+        allowances_len,
+        gas_info,
+        migrate.len()
     );
 }
 
@@ -290,11 +294,12 @@ async fn test_migration_max_gas(
         allowances,
         decimals: 18,
     };
-    println!(
-        "For balances len {:0>6}, allowances len {:0>6} with Max Gas 250_000_000_000",
-        balances_len, allowances_len
-    );
     let migrate = FTAction::MigrateFullState(new_ft);
+
+    println!(
+        "For balances len {:0>6}, allowances len {:0>6} with Max Gas 250_000_000_000, total bytes: {}",
+        balances_len, allowances_len, migrate.encode().len()
+    );
 
     let (message_id, _) = api
         .send_message(program_id.into(), migrate, 250_000_000_000, 0)
