@@ -84,11 +84,15 @@ async fn migration_by_init() -> Result<()> {
     // Checking that blocks still running.
     assert!(listener.blocks_running().await?);
 
-    migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
-    migration_by_init_with_len(&api, &mut listener, 10, 1).await?;
-    migration_by_init_with_len(&api, &mut listener, 100, 1).await?;
-    migration_by_init_with_len(&api, &mut listener, 1000, 1).await?;
-    migration_by_init_with_len(&api, &mut listener, 10_000, 1).await?;
+    // migration_by_init_with_len(&api, &mut listener, 1, 1).await?;
+    // migration_by_init_with_len(&api, &mut listener, 10, 1).await?;
+    // migration_by_init_with_len(&api, &mut listener, 100, 1).await?;
+    // migration_by_init_with_len(&api, &mut listener, 1000, 1).await?;
+
+    for n in 1..=100u64 {
+        migration_by_init_with_len(&api, &mut listener, n * 1_000, 1).await?;
+    }
+    // migration_by_init_with_len(&api, &mut listener, 10_000, 1).await?;
     // No passed because 'Transaction would exhaust the block limits'
     // migration_by_init_with_len(&api, &mut listener, 100_000, 1).await?;
 

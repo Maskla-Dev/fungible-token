@@ -246,19 +246,15 @@ extern "C" fn init() {
     let init: Initialize = msg::load().expect("Unable to decode InitConfig");
     use ft_io::Initialize::{Config, MigrateFullState};
     let ft = match init {
-        Config(config) => {
-            FungibleToken {
-                name: config.name,
-                symbol: config.symbol,
-                decimals: config.decimals,
-                ..Default::default()
-            }
+        Config(config) => FungibleToken {
+            name: config.name,
+            symbol: config.symbol,
+            decimals: config.decimals,
+            ..Default::default()
         },
-        MigrateFullState(io_ft) => {
-            FungibleToken::prepare_new_state(io_ft)
-        }
+        MigrateFullState(io_ft) => FungibleToken::prepare_new_state(io_ft),
     };
-    
+
     unsafe { FUNGIBLE_TOKEN = Some(ft) };
 }
 
