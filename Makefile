@@ -43,7 +43,7 @@ pre-commit: fmt lint full-test
 
 test:
 	@echo ⚙️ Running unit tests...
-	@cargo +nightly t --release
+	@cargo +nightly t --release -Fbinary-vendor
 
 full-test:
 	@echo ⚙️ Running all tests...

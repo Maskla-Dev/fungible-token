@@ -10,6 +10,7 @@ gstd = { git = "https://github.com/gear-tech/gear.git", rev = "5c685d0f15c412ab6
 ft-io = { path = "io" }
 hashbrown = "0.13"
 gmeta = { git = "https://github.com/gear-tech/gear", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68" }
+migrate-macro = { path = "../gear-lib/migrate-macro" }
 
 [dev-dependencies]
 gstd = { git = "https://github.com/gear-tech/gear.git", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68", features = ["debug"] }

@@ -19,7 +19,7 @@ impl Metadata for FungibleTokenMetadata {
 #[scale_info(crate = gstd::scale_info)]
 pub enum Initialize {
     Config(InitConfig),
-    MigrateFullState(IoFungibleToken),
+    State(IoFungibleToken),
 }
 
 #[derive(Debug, Decode, Encode, TypeInfo)]
@@ -48,7 +48,8 @@ pub enum FTAction {
     },
     TotalSupply,
     BalanceOf(ActorId),
-    MigrateFullState(IoFungibleToken),
+    UpgradeState(IoFungibleToken),
+    MigrateState(ActorId),
 }
 
 #[derive(Debug, Encode, Decode, TypeInfo)]
@@ -67,7 +68,8 @@ pub enum FTEvent {
     },
     TotalSupply(u128),
     Balance(u128),
-    Updated,
+    StateUpdated,
+    StateMigrated,
 }
 
 #[derive(Debug, Clone, Default, Encode, Decode, TypeInfo)]

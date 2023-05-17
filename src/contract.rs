@@ -4,6 +4,7 @@ use gstd::{debug, errors::Result as GstdResult, exec, msg, prelude::*, ActorId, 
 use hashbrown::HashMap;
 
 const ZERO_ID: ActorId = ActorId::new([0u8; 32]);
+const RESERVATION_AMOUNT: u64 = 50_000_000_000;
 
 #[derive(Debug, Clone, Default)]
 struct FungibleToken {
@@ -232,11 +233,17 @@ extern "C" fn handle() {
             let balance = ft.balances.get(&account).unwrap_or(&0);
             msg::reply(FTEvent::Balance(*balance), 0).unwrap();
         }
-        FTAction::MigrateFullState(new_state) => {
+        FTAction::UpgradeState(new_state) => {
             let new_ft = FungibleToken::prepare_new_state(new_state);
             unsafe { FUNGIBLE_TOKEN.insert(new_ft) };
 
-            msg::reply(FTEvent::Updated, 0).unwrap();
+            msg::reply(FTEvent::StateUpdated, 0).unwrap();
+        }
+        FTAction::MigrateState(program_id) => {
+            let ft = common_state();
+            let upgrade_state = FTAction::UpgradeState(ft);
+            msg::send(program_id, upgrade_state, 0).expect("Error at sending upgrade");
+            msg::reply(FTEvent::StateMigrated, 0).expect("Error at sending reply");
         }
     }
 }
@@ -244,15 +251,15 @@ extern "C" fn handle() {
 #[no_mangle]
 extern "C" fn init() {
     let init: Initialize = msg::load().expect("Unable to decode InitConfig");
-    use ft_io::Initialize::{Config, MigrateFullState};
+
     let ft = match init {
-        Config(config) => FungibleToken {
+        Initialize::Config(config) => FungibleToken {
             name: config.name,
             symbol: config.symbol,
             decimals: config.decimals,
             ..Default::default()
         },
-        MigrateFullState(io_ft) => FungibleToken::prepare_new_state(io_ft),
+        Initialize::State(io_ft) => FungibleToken::prepare_new_state(io_ft),
     };
 
     unsafe { FUNGIBLE_TOKEN = Some(ft) };
@@ -297,4 +304,8 @@ pub enum StateReply {
     Decimals(u8),
     TotalSupply(u128),
     Balance(u128),
+}
+
+fn system_reserve_gas() {
+    exec::system_reserve_gas(RESERVATION_AMOUNT).expect("Error during system gas reservation");
 }
