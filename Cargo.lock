@@ -887,7 +887,6 @@ dependencies = [
  "gstd",
  "gtest",
  "hashbrown 0.13.2",
- "migrate-macro",
  "tokio",
 ]
 
@@ -1932,16 +1931,6 @@ dependencies = [
  "keccak",
  "rand_core 0.5.1",
  "zeroize",
-]
-
-[[package]]
-name = "migrate-macro"
-version = "0.1.0"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
