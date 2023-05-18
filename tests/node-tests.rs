@@ -76,7 +76,7 @@ async fn mint_test() -> Result<()> {
 
 #[tokio::test]
 #[ignore]
-async fn by_init() -> Result<()> {
+async fn set_state_on_init() -> Result<()> {
     let api = GearApi::dev().await?;
 
     let mut listener = api.subscribe().await?; // Subscribing for events.
@@ -84,32 +84,34 @@ async fn by_init() -> Result<()> {
     // Checking that blocks still running.
     assert!(listener.blocks_running().await?);
 
-    by_init_with_len(&api, &mut listener, 1, 1).await?;
-    by_init_with_len(&api, &mut listener, 10, 1).await?;
-    by_init_with_len(&api, &mut listener, 100, 1).await?;
+    assert!(init_state_with_len(&api, &mut listener, 1, 1).await?);
+    assert!(init_state_with_len(&api, &mut listener, 10, 1).await?);
+    assert!(init_state_with_len(&api, &mut listener, 100, 1).await?);
 
     for n in 1..=18u64 {
-        by_init_with_len(&api, &mut listener, n * 1_000, 1).await?;
+        assert!(init_state_with_len(&api, &mut listener, n * 1_000, 1).await?);
     }
     // No passed because 'Transaction would exhaust the block limits'
-    // migration_by_init_with_len(&api, &mut listener, 100_000, 1).await?;
+    assert!(init_state_with_len(&api, &mut listener, 100_000, 1)
+        .await
+        .is_err());
 
-    by_init_with_len(&api, &mut listener, 1, 1).await?;
-    by_init_with_len(&api, &mut listener, 10, 10).await?;
-    by_init_with_len(&api, &mut listener, 100, 100).await?;
+    assert!(init_state_with_len(&api, &mut listener, 1, 1).await?);
+    assert!(init_state_with_len(&api, &mut listener, 10, 10).await?);
+    assert!(init_state_with_len(&api, &mut listener, 100, 100).await?);
+
     // No passed because 'Not enught gas to continue execution'
-    // migration_by_init_with_len(&api, &mut listener, 1000, 1000).await?;
-    // migration_by_init_with_len(&api, &mut listener, 10_000, 10_000).await?;
+    assert!(!init_state_with_len(&api, &mut listener, 1000, 1000).await?);
 
     Ok(())
 }
 
-async fn by_init_with_len(
+async fn init_state_with_len(
     api: &GearApi,
     listener: &mut EventListener,
     balances_len: u64,
     allowances_len: u64,
-) -> Result<()> {
+) -> Result<bool> {
     let new_ft = create_fungible_token(balances_len, allowances_len);
 
     // Init
@@ -137,9 +139,7 @@ async fn by_init_with_len(
         )
         .await?;
 
-    assert!(listener.message_processed(message_id).await?.succeed());
-
-    Ok(())
+    Ok(listener.message_processed(message_id).await?.succeed())
 }
 
 #[tokio::test]
@@ -269,45 +269,58 @@ async fn upgrade_by_handle() -> Result<()> {
     // No passed because Not enough gas to continue execution
     // print_gas_info(&api, program_id.into_bytes(), 100_000, 1).await;
 
-    test_upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 1).await?;
-    test_upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 10).await?;
-    test_upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 100).await?;
-    test_upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 1000).await?;
-    test_upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 10_000).await?;
-    // No passed because Not enough gas to continue execution
-    // test_migration_with_balances(&api, &mut listener, program_id.into_bytes(), 100_000).await?;
+    upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 1).await?;
+    upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 10).await?;
+    upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 100).await?;
+    upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 1000).await?;
+    upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 10_000).await?;
 
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10, 1).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 100, 1).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1000, 1).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10_000, 1).await?;
     // No passed because Not enough gas to continue execution
-    // test_migration_with_len(&api, &mut listener, program_id.into_bytes(), 100_000, 1).await?;
+    let is_err = upgrade_with_balances(&api, &mut listener, program_id.into_bytes(), 100_000)
+        .await
+        .is_err();
+    assert!(is_err);
 
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10, 10).await?;
-    test_upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 100, 100).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 100, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1000, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10_000, 1).await?;
+
     // No passed because Not enough gas to continue execution
-    // test_migration_with_len(&api, &mut listener, program_id.into_bytes(), 1000, 1000).await?;
-    // test_migration_with_len(&api, &mut listener, program_id.into_bytes(), 10_000, 10_000).await?;
-    // test_migration_with_len(&api, &mut listener, program_id.into_bytes(), 100_000, 100_000).await?;
+    let is_err = upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 100_000, 1)
+        .await
+        .is_err();
+    assert!(is_err);
 
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10, 1).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 100, 1).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10_000, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 10, 10).await?;
+    upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 100, 100).await?;
+
+    // No passed because Not enough gas to continue execution
+    let is_err = upgrade_with_len(&api, &mut listener, program_id.into_bytes(), 1000, 1000)
+        .await
+        .is_err();
+    assert!(is_err);
+
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10, 1).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 100, 1).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10_000, 1).await?;
+
     // No passed because "Transaction would exhaust the block limits"
-    // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 100_000, 1).await?;
-    // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 1_000_000, 1).await?;
+    let is_err = upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 100_000, 1)
+        .await
+        .is_err();
+    assert!(is_err);
 
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10, 10).await?;
-    test_upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 100, 100).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1, 1).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 10, 10).await?;
+    upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 100, 100).await?;
+
     // No passed because Not enough gas to continue execution
-    // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1000).await?;
-    // test_migration_max_gas(&api, &mut listener, program_id.into_bytes(), 10000, 10000).await?;
+    assert!(!upgrade_max_gas(&api, &mut listener, program_id.into_bytes(), 1000, 1000).await?);
 
     Ok(())
 }
@@ -351,13 +364,13 @@ async fn print_gas_info(
     );
 }
 
-async fn test_upgrade_max_gas(
+async fn upgrade_max_gas(
     api: &GearApi,
     listener: &mut EventListener,
     program_id: [u8; 32],
     balances_len: u64,
     allowances_len: u64,
-) -> Result<()> {
+) -> Result<bool> {
     let balances = (0..balances_len).map(|v| (v.into(), v as u128)).collect();
     let allowances = (0..allowances_len)
         .map(|v| (v.into(), vec![(0.into(), v as u128); 1]))
@@ -382,14 +395,10 @@ async fn test_upgrade_max_gas(
         .send_message(program_id.into(), upgrade, 250_000_000_000, 0)
         .await?;
 
-    assert!(listener.message_processed(message_id).await?.succeed());
-
-    assert!(listener.blocks_running().await?);
-
-    Ok(())
+    Ok(listener.message_processed(message_id).await?.succeed())
 }
 
-async fn test_upgrade_with_len(
+async fn upgrade_with_len(
     api: &GearApi,
     listener: &mut EventListener,
     program_id: [u8; 32],
@@ -414,8 +423,7 @@ async fn test_upgrade_with_len(
 
     let gas_info = api
         .calculate_handle_gas(None, program_id.into(), upgrade.encode(), 0, true)
-        .await
-        .unwrap();
+        .await?;
 
     println!(
         "For balances len {:0>6}, allowances len {:0>6}: {:?}",
@@ -433,11 +441,11 @@ async fn test_upgrade_with_len(
     Ok(())
 }
 
-async fn test_upgrade_with_balances(
+async fn upgrade_with_balances(
     api: &GearApi,
     listener: &mut EventListener,
     program_id: [u8; 32],
     balances_len: u64,
 ) -> Result<()> {
-    test_upgrade_with_len(api, listener, program_id, balances_len, 0).await
+    upgrade_with_len(api, listener, program_id, balances_len, 0).await
 }
