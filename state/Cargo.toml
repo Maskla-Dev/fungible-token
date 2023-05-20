@@ -4,9 +4,9 @@ version = "0.1.5"
 edition = "2021"
 
 [dependencies]
-gstd = { git = "https://github.com/gear-tech/gear", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68" }
-gmeta = { git = "https://github.com/gear-tech/gear", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68", features = ["codegen"] }
+gstd = { git = "https://github.com/gear-tech/gear", branch = "dn-reply-provision" }
+gmeta = { git = "https://github.com/gear-tech/gear", branch = "dn-reply-provision", features = ["codegen"] }
 ft-io = { path = "../io" }
 
 [build-dependencies]
-gear-wasm-builder = { git = "https://github.com/gear-tech/gear", rev = "5c685d0f15c412ab6ee019ceaf7ce084426dfb68", features = ["metawasm"] }
+gear-wasm-builder = { git = "https://github.com/gear-tech/gear", branch = "dn-reply-provision", features = ["metawasm"] }
