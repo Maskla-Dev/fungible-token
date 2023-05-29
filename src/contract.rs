@@ -4,10 +4,11 @@ use gstd::{
     debug, errors::Result as GstdResult, exec, msg, ops::Range, prelude::*, ActorId, MessageId,
 };
 use hashbrown::HashMap;
+use parity_scale_codec::DecodeAll;
 
 const ZERO_ID: ActorId = ActorId::new([0u8; 32]);
 
-const MAX_LEN: u64 = 10_000;
+const MAX_LEN: u64 = 5_000;
 
 #[derive(Debug, Clone, Default)]
 struct FungibleToken {
@@ -171,7 +172,7 @@ impl FungibleToken {
 
     fn set_migration_state(&mut self, migration_state: MigrationState) {
         gstd::debug!(
-            "set_migration_state() ProgramID: {}, {}",
+            "AZOYAN set_migration_state() ProgramID: {}, {}",
             self.name,
             migration_state
         );
@@ -203,7 +204,7 @@ impl FungibleToken {
 
         let part = Part {
             current: 0,
-            total: ranges.len() as u64 - 1,
+            total: ranges.len() as u64,
         };
         let ms = MigrationState {
             migration_role: role,
@@ -226,7 +227,7 @@ impl FungibleToken {
         };
 
         gstd::debug!(
-            "begin_migration() ProgramID: {:?}, part: {:?}, is_migration_state = {}",
+            "AZOYAN begin_migration() ProgramID: {:?}, part: {:?}, is_migration_state = {}",
             self.name,
             part,
             self.migration_state.is_some()
@@ -239,9 +240,11 @@ impl FungibleToken {
 
     fn continue_migration(&mut self, program_id: ActorId) {
         let migration_state = self.migration_state.as_mut().unwrap();
-        migration_state.part.current += 1;
 
+        migration_state.part.current += 1;
         let range = &migration_state.ranges[migration_state.part.current as usize];
+
+
         let data = migration_state.data[range.start as usize..range.end as usize]
             .iter()
             .copied()
@@ -255,7 +258,7 @@ impl FungibleToken {
         };
 
         gstd::debug!(
-            "continue_migration() ProgramID: {:?}, part: {:?}, is_migration_state = {}",
+            "AZOYAN continue_migration() ProgramID: {:?}, part: {:?}, is_migration_state = {}",
             self.name,
             part,
             self.migration_state.is_some()
@@ -272,7 +275,7 @@ impl FungibleToken {
         range: Range<u64>,
     ) {
         gstd::debug!(
-            "begin_upgrade(): ProgramID: {:?}, Part: {:?}, range: {:?}",
+            "AZOYAN begin_upgrade(): ProgramID: {:?}, Part: {:?}, range: {:?}",
             self.name,
             part,
             range
@@ -316,7 +319,7 @@ impl FungibleToken {
                     return;
                 }
                 gstd::debug!(
-                    "continue_upgrade(): ProgramID: {:?}, Part: {:?}, range: {:?}",
+                    "AZOYAN continue_upgrade(): ProgramID: {:?}, Part: {:?}, range: {:?}",
                     self.name,
                     part,
                     range
@@ -327,19 +330,11 @@ impl FungibleToken {
 
                 let checksum = calc_checksum(&migration_state.data);
                 if total_checksum == checksum {
-                    use parity_scale_codec::DecodeAll;
                     let new_state =
                         IoFungibleToken::decode_all(&mut migration_state.data.as_slice())
                             .expect("Decode IoFungibleToken");
                     let new_ft = Self::prepare_new_state(new_state);
-
-                    self.balances = new_ft.balances;
-                    self.allowances = new_ft.allowances;
-                    self.decimals = new_ft.decimals;
-                    self.name = new_ft.name;
-                    self.symbol = new_ft.symbol;
-                    self.total_supply = new_ft.total_supply;
-                    self.migration_state = None;
+                    *self = new_ft;                  
                 }
                 msg::reply(FTEvent::StateUpgraded { checksum }, 0).expect("Can't reply");
             }
@@ -450,11 +445,53 @@ extern "C" fn handle() {
                 );
                 ft.continue_upgrade(data, total_checksum, part, range);
             } else {
-                ft.begin_upgrade(data, total_checksum, part, range);
+                // ft.begin_upgrade(data, total_checksum, part, range);
+
+
+                gstd::debug!(
+                    "AZOYAN begin_upgrade(): ProgramID: {:?}, Part: {:?}, range: {:?}",
+                    ft.name,
+                    part,
+                    range
+                );
+                let checksum = calc_checksum(&data);
+                if total_checksum != checksum {
+                    let migration_state = MigrationState {
+                        migration_role: MigrationRole::Receiver {
+                            migration_initiator: msg::source(),
+                        },
+                        ranges: vec![range],
+                        part,
+                        total_checksum,
+                        data,
+                        message_id: msg::id(),
+                    };
+                    // self.set_migration_state(migration_state);
+
+                    gstd::debug!(
+                        "AZOYAN set_migration_state() ProgramID: {}, {}",
+                        ft.name,
+                        migration_state
+                    );
+                    ft.migration_state = Some(migration_state);
+                }
+                else {
+                    let new_state =
+                    IoFungibleToken::decode_all(&mut data.as_slice())
+                    .expect("Decode IoFungibleToken");
+                let new_ft = FungibleToken::prepare_new_state(new_state);
+                gstd::debug!(
+                    "AZOYAN Upgraded ProgramID: {}, new: {}",
+                    ft.name,
+                    new_ft.name
+                );
+                *ft = new_ft;
+                }
                 gstd::debug!(
                     "AZOYAN After begin_upgrade() ProgramID: {}, migration_state = None",
                     ft.name
                 );
+                msg::reply(FTEvent::StateUpgraded { checksum }, 0).expect("Can't send reply");
             }
         }
         FTAction::MigrateState(program_id) => {
@@ -501,7 +538,7 @@ extern "C" fn handle_reply() {
                 match reply {
                     FTEvent::StateUpgraded { checksum } => {
                         gstd::debug!(
-                            "ProgramID: {:?}, StateUpgraded from ProgramID: {:?}, total_checksum: {}, checksum: {}",
+                            "AZOYAN ProgramID: {:?}, StateUpgraded from ProgramID: {:?}, total_checksum: {}, checksum: {}",
                             ft.name,
                             msg::source(),
                             migration_state.total_checksum,
@@ -510,13 +547,15 @@ extern "C" fn handle_reply() {
 
                         if migration_state.total_checksum == checksum {
                             ft.migration_state = None;
-                            gstd::debug!("Migration done");
+                            gstd::debug!("AZOYAN Migration done");
                         } else {
-                            gstd::debug!("ProgramID: {:?} Ready ot continue. Send action MigrateState to continue",
+                            gstd::debug!("AZOYAN ProgramID: {:?} Ready ot continue. Send action MigrateState to continue",
                         gstd::exec::program_id());
                         }
                     }
-                    FTEvent::AlreadyInMigrationState => gstd::debug!("Already in Migration State"),
+                    FTEvent::AlreadyInMigrationState => {
+                        gstd::debug!("AZOYAN Already in Migration State")
+                    }
                     _ => unreachable!("Unexpected replies when contract at migration state"),
                 }
             }

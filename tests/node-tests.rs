@@ -153,7 +153,7 @@ async fn migrate_by_handle() -> Result<()> {
     assert!(listener.blocks_running().await?);
 
     // Init first token
-    let ft_io = create_fungible_token(377, 1);
+    let ft_io = create_fungible_token(20_000, 0);
 
     // Init second token
     let init_ft = Initialize::State(ft_io).encode();
@@ -168,6 +168,7 @@ async fn migrate_by_handle() -> Result<()> {
             gclient::now_micros().to_le_bytes(),
             init_ft,
             250_000_000_000,
+            // gas_info.min_limit,
             0,
         )
         .await?;
@@ -210,10 +211,19 @@ async fn migrate_by_handle() -> Result<()> {
             .unwrap();
 
         let (message_id, _) = api
-            .send_message(program_id_1, migrate_state, gas_info.min_limit, 0)
+            .send_message(program_id_1, migrate_state, 250_000_000_000, 0)
             .await?;
 
         assert!(listener.message_processed(message_id).await?.succeed());
+
+        let state: IoFungibleToken = api
+            .read_state(program_id_2)
+            .await
+            .expect("Can't read state");
+        println!("AZOYAN program 2 state.name = {}", state.name);
+        if state.name == "token 1" {
+            break;
+        }
     }
 
     Ok(())
@@ -332,8 +342,8 @@ fn create_fungible_token(balances_len: u64, allowances_len: u64) -> IoFungibleTo
         .collect();
 
     IoFungibleToken {
-        name: "new-token".to_string(),
-        symbol: "NT".to_string(),
+        name: "token 1".to_string(),
+        symbol: "T1".to_string(),
         total_supply: 1_000_000,
         balances,
         allowances,
