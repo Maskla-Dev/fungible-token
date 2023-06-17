@@ -27,8 +27,14 @@ pub struct InitConfig {
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
 pub enum FTAction {
-    Mint(u128),
-    Burn(u128),
+    Mint{
+        receipt: ActorId,
+        amount: u128,
+    },
+    Burn{
+        receipt: ActorId,
+        amount: u128,
+    },
     Transfer {
         from: ActorId,
         to: ActorId,

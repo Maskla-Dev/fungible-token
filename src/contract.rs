@@ -1,12 +1,14 @@
 use ft_io::*;
 use gmeta::Metadata;
-use gstd::{debug, errors::Result as GstdResult, exec, msg, prelude::*, ActorId, MessageId};
+use gstd::{debug, errors::Result as GstdResult, exec, msg, prelude::*, ActorId, MessageId, Decode, Encode, TypeInfo};
 use hashbrown::HashMap;
 
 const ZERO_ID: ActorId = ActorId::new([0u8; 32]);
 
 #[derive(Debug, Clone, Default)]
 struct FungibleToken {
+    // Address of the who can process transactions.
+    admin: ActorId,
     /// Name of the token.
     name: String,
     /// Symbol of the token.
@@ -25,9 +27,9 @@ static mut FUNGIBLE_TOKEN: Option<FungibleToken> = None;
 
 impl FungibleToken {
     /// Executed on receiving `fungible-token-messages::MintInput`.
-    fn mint(&mut self, amount: u128) {
+    fn mint(&mut self, receipt: &ActorId, amount: u128) {
         self.balances
-            .entry(msg::source())
+            .entry(*receipt)
             .and_modify(|balance| *balance += amount)
             .or_insert(amount);
         self.total_supply += amount;
@@ -42,8 +44,8 @@ impl FungibleToken {
         .unwrap();
     }
     /// Executed on receiving `fungible-token-messages::BurnInput`.
-    fn burn(&mut self, amount: u128) {
-        if self.balances.get(&msg::source()).unwrap_or(&0) < &amount {
+    fn burn(&mut self, receipt: &ActorId,amount: u128) {
+        if self.balances.get(receipt).unwrap_or(&0) < &amount {
             panic!("Amount exceeds account balance");
         }
         self.balances
@@ -132,11 +134,15 @@ impl FungibleToken {
         }
         false
     }
+    fn is_admin(&mut self) -> bool{
+        return msg::source() == self.admin;
+    }
 }
 
 fn common_state() -> <FungibleTokenMetadata as Metadata>::State {
     let state = static_mut_state();
     let FungibleToken {
+        admin,
         name,
         symbol,
         total_supply,
@@ -185,11 +191,11 @@ extern "C" fn handle() {
     let action: FTAction = msg::load().expect("Could not load Action");
     let ft: &mut FungibleToken = unsafe { FUNGIBLE_TOKEN.get_or_insert(Default::default()) };
     match action {
-        FTAction::Mint(amount) => {
-            ft.mint(amount);
+        FTAction::Mint{receipt, amount} => {
+            ft.mint(&receipt, amount);
         }
-        FTAction::Burn(amount) => {
-            ft.burn(amount);
+        FTAction::Burn{receipt, amount} => {
+            ft.burn(&receipt,amount);
         }
         FTAction::Transfer { from, to, amount } => {
             ft.transfer(&from, &to, amount);
@@ -205,12 +211,14 @@ extern "C" fn handle() {
             msg::reply(FTEvent::Balance(*balance), 0).unwrap();
         }
     }
+
 }
 
 #[no_mangle]
 extern "C" fn init() {
     let config: InitConfig = msg::load().expect("Unable to decode InitConfig");
     let ft = FungibleToken {
+        admin: msg::source(),
         name: config.name,
         symbol: config.symbol,
         decimals: config.decimals,
